@@ -2,10 +2,9 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Platform</title>
+    <title>3D Platform with Three.js</title>
     <style>
         body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
         #fullscreenBtn {
             position: absolute;
             bottom: 20px;
@@ -16,6 +15,7 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            z-index: 100;
         }
         #joystick {
             position: absolute;
@@ -26,6 +26,7 @@
             background: rgba(0,0,0,0.3);
             border-radius: 50%;
             display: none;
+            z-index: 100;
         }
         #joystickKnob {
             position: absolute;
@@ -39,17 +40,14 @@
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
+    <div id="container"></div>
     <button id="fullscreenBtn">Fullscreen</button>
     <div id="joystick"><div id="joystickKnob"></div></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const joystick = document.getElementById('joystick');
-        const joystickKnob = document.getElementById('joystickKnob');
-
+        let container, camera, scene, renderer, controls;
         let isMobile = false;
         let joystickActive = false;
         let joystickX = 0;
@@ -58,226 +56,187 @@
         let joystickStartY = 0;
         let joystickKnobX = 0;
         let joystickKnobY = 0;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        const platformSize = 20;
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        const player = {
-            x: 0,
-            y: 1.6,
-            z: 0,
-            rotX: 0,
-            rotY: 0,
-            speed: 0.1
-        };
-
-        const platform = {
-            size: 20,
-            height: 0
-        };
-
-        const keys = {};
-        const mouse = { x: 0, y: 0, prevX: 0, prevY: 0, isDown: false };
+        init();
+        animate();
 
         function init() {
-            window.addEventListener('resize', resize);
-            document.addEventListener('keydown', keyDown);
-            document.addEventListener('keyup', keyUp);
-            canvas.addEventListener('mousedown', mouseDown);
-            canvas.addEventListener('mouseup', mouseUp);
-            canvas.addEventListener('mousemove', mouseMove);
-            canvas.addEventListener('touchstart', handleTouch, { passive: false });
-            canvas.addEventListener('touchmove', handleTouch, { passive: false });
-            canvas.addEventListener('touchend', handleTouchEnd);
-            fullscreenBtn.addEventListener('click', toggleFullscreen);
-
+            container = document.getElementById('container');
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = 1.6;
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.FogExp2(0x87CEEB, 0.002);
+            
+            const platformGeometry = new THREE.PlaneGeometry(platformSize, platformSize);
+            const platformMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x228B22,
+                side: THREE.DoubleSide
+            });
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.rotation.x = -Math.PI / 2;
+            scene.add(platform);
+            
+            const gridHelper = new THREE.GridHelper(platformSize, platformSize);
+            scene.add(gridHelper);
+            
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+            
+            controls = new THREE.PointerLockControls(camera, container);
+            
+            document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+            
             if ('ontouchstart' in window) {
                 isMobile = true;
-                joystick.style.display = 'block';
+                document.getElementById('joystick').style.display = 'block';
+                
+                const joystick = document.getElementById('joystick');
+                const joystickKnob = document.getElementById('joystickKnob');
+                
+                container.addEventListener('touchstart', function(e) {
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        const rect = container.getBoundingClientRect();
+                        const touchX = touch.clientX - rect.left;
+                        const touchY = touch.clientY - rect.top;
+                        
+                        if (touchX < window.innerWidth * 0.5) {
+                            joystickActive = true;
+                            joystickStartX = joystick.offsetLeft + joystick.offsetWidth / 2;
+                            joystickStartY = joystick.offsetTop + joystick.offsetHeight / 2;
+                            joystickX = touchX;
+                            joystickY = touchY;
+                            updateJoystick();
+                        }
+                    }
+                });
+                
+                container.addEventListener('touchmove', function(e) {
+                    e.preventDefault();
+                    if (e.touches.length === 1 && joystickActive) {
+                        const touch = e.touches[0];
+                        const rect = container.getBoundingClientRect();
+                        joystickX = touch.clientX - rect.left;
+                        joystickY = touch.clientY - rect.top;
+                        updateJoystick();
+                    }
+                });
+                
+                container.addEventListener('touchend', function() {
+                    joystickActive = false;
+                    joystickKnob.style.transform = 'translate(20px, 20px)';
+                    moveForward = moveBackward = moveLeft = moveRight = false;
+                });
+            } else {
+                document.addEventListener('keydown', onKeyDown);
+                document.addEventListener('keyup', onKeyUp);
+                container.addEventListener('click', function() {
+                    controls.lock();
+                });
             }
-
-            resize();
-            loop();
+            
+            window.addEventListener('resize', onWindowResize);
         }
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-
-        function keyDown(e) {
-            keys[e.key.toLowerCase()] = true;
-        }
-
-        function keyUp(e) {
-            keys[e.key.toLowerCase()] = false;
-        }
-
-        function mouseDown(e) {
-            mouse.isDown = true;
-            mouse.prevX = e.clientX;
-            mouse.prevY = e.clientY;
-        }
-
-        function mouseUp() {
-            mouse.isDown = false;
-        }
-
-        function mouseMove(e) {
-            if (mouse.isDown) {
-                const dx = e.clientX - mouse.prevX;
-                const dy = e.clientY - mouse.prevY;
-                player.rotY -= dx * 0.002;
-                player.rotX -= dy * 0.002;
-                player.rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, player.rotX));
-                mouse.prevX = e.clientX;
-                mouse.prevY = e.clientY;
-            }
-        }
-
-        function handleTouch(e) {
-            e.preventDefault();
-            if (e.touches.length === 1) {
-                const touch = e.touches[0];
-                const rect = canvas.getBoundingClientRect();
-                const touchX = touch.clientX - rect.left;
-                const touchY = touch.clientY - rect.top;
-
-                if (touchX < canvas.width * 0.5) {
-                    joystickActive = true;
-                    joystickStartX = joystick.offsetLeft + joystick.offsetWidth / 2;
-                    joystickStartY = joystick.offsetTop + joystick.offsetHeight / 2;
-                    joystickX = touchX;
-                    joystickY = touchY;
-                    updateJoystick();
-                } else {
-                    mouse.isDown = true;
-                    mouse.prevX = touchX;
-                    mouse.prevY = touchY;
-                }
-            }
-        }
-
-        function handleTouchEnd() {
-            joystickActive = false;
-            joystickKnob.style.transform = 'translate(20px, 20px)';
-            mouse.isDown = false;
-        }
-
+        
         function updateJoystick() {
-            if (!joystickActive) return;
-
             const dx = joystickX - joystickStartX;
             const dy = joystickY - joystickStartY;
             const distance = Math.min(30, Math.sqrt(dx*dx + dy*dy));
             const angle = Math.atan2(dy, dx);
-
+            
             joystickKnobX = Math.cos(angle) * distance;
             joystickKnobY = Math.sin(angle) * distance;
-            joystickKnob.style.transform = `translate(${joystickKnobX + 20}px, ${joystickKnobY + 20}px)`;
+            document.getElementById('joystickKnob').style.transform = `translate(${joystickKnobX + 20}px, ${joystickKnobY + 20}px)`;
+            
+            moveForward = joystickKnobY < -10;
+            moveBackward = joystickKnobY > 10;
+            moveLeft = joystickKnobX < -10;
+            moveRight = joystickKnobX > 10;
         }
-
+        
+        function onKeyDown(event) {
+            switch (event.key.toLowerCase()) {
+                case 'w': case 'ц': moveForward = true; break;
+                case 'a': case 'ф': moveLeft = true; break;
+                case 's': case 'ы': moveBackward = true; break;
+                case 'd': case 'в': moveRight = true; break;
+            }
+        }
+        
+        function onKeyUp(event) {
+            switch (event.key.toLowerCase()) {
+                case 'w': case 'ц': moveForward = false; break;
+                case 'a': case 'ф': moveLeft = false; break;
+                case 's': case 'ы': moveBackward = false; break;
+                case 'd': case 'в': moveRight = false; break;
+            }
+        }
+        
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
-                canvas.requestFullscreen().catch(err => {
+                container.requestFullscreen().catch(err => {
                     console.error(`Error attempting to enable fullscreen: ${err.message}`);
                 });
             } else {
                 document.exitFullscreen();
             }
         }
-
-        function movePlayer() {
-            let moveX = 0;
-            let moveZ = 0;
-
-            if (joystickActive) {
-                moveX = joystickKnobX / 30;
-                moveZ = joystickKnobY / 30;
-            } else {
-                if (keys['w'] || keys['ц']) moveZ = -1;
-                if (keys['s'] || keys['ы']) moveZ = 1;
-                if (keys['a'] || keys['ф']) moveX = -1;
-                if (keys['d'] || keys['в']) moveX = 1;
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (controls.isLocked || isMobile) {
+                const delta = 0.1;
+                
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+                
+                if (moveForward || moveBackward) velocity.z -= direction.z * 5.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 5.0 * delta;
+                
+                if (isMobile) {
+                    controls.moveRight(-velocity.x * delta);
+                    controls.moveForward(-velocity.z * delta);
+                } else {
+                    controls.moveRight(velocity.x * delta);
+                    controls.moveForward(velocity.z * delta);
+                }
+                
+                const halfSize = platformSize / 2;
+                camera.position.x = Math.max(-halfSize, Math.min(halfSize, camera.position.x));
+                camera.position.z = Math.max(-halfSize, Math.min(halfSize, camera.position.z));
             }
-
-            const speed = player.speed;
-            const sinY = Math.sin(player.rotY);
-            const cosY = Math.cos(player.rotY);
-
-            player.x += (moveZ * sinY + moveX * cosY) * speed;
-            player.z += (moveZ * cosY - moveX * sinY) * speed;
-
-            const halfSize = platform.size / 2;
-            player.x = Math.max(-halfSize, Math.min(halfSize, player.x));
-            player.z = Math.max(-halfSize, Math.min(halfSize, player.z));
+            
+            renderer.render(scene, camera);
         }
-
-        function drawScene() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const horizon = canvas.height / 2;
-            const scale = canvas.height / 2;
-
-            ctx.fillStyle = '#87CEEB';
-            ctx.fillRect(0, 0, canvas.width, horizon);
-
-            ctx.fillStyle = '#228B22';
-            ctx.fillRect(0, horizon, canvas.width, canvas.height - horizon);
-
-            const gridSize = platform.size;
-            const gridStep = 1;
-            const gridColor = '#555';
-
-            for (let x = -gridSize; x <= gridSize; x += gridStep) {
-                drawLine(x, 0, -gridSize, x, 0, gridSize, gridColor);
-            }
-
-            for (let z = -gridSize; z <= gridSize; z += gridStep) {
-                drawLine(-gridSize, 0, z, gridSize, 0, z, gridColor);
-            }
-        }
-
-        function drawLine(x1, y1, z1, x2, y2, z2, color) {
-            const p1 = projectPoint(x1 - player.x, y1 - player.y, z1 - player.z);
-            const p2 = projectPoint(x2 - player.x, y2 - player.y, z2 - player.z);
-
-            if (p1.z > 0 && p2.z > 0) {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-            }
-        }
-
-        function projectPoint(x, y, z) {
-            const cosX = Math.cos(player.rotX);
-            const sinX = Math.sin(player.rotX);
-            const cosY = Math.cos(player.rotY);
-            const sinY = Math.sin(player.rotY);
-
-            const rotYx = x * cosY - z * sinY;
-            const rotYz = x * sinY + z * cosY;
-
-            const rotXy = y * cosX - rotYz * sinX;
-            const rotXz = y * sinX + rotYz * cosX;
-
-            const scale = canvas.height / 2;
-            const projectedX = rotYx / rotXz * scale + canvas.width / 2;
-            const projectedY = -rotXy / rotXz * scale + canvas.height / 2;
-
-            return { x: projectedX, y: projectedY, z: rotXz };
-        }
-
-        function loop() {
-            movePlayer();
-            drawScene();
-            requestAnimationFrame(loop);
-        }
-
-        init();
     </script>
 </body>
 </html>

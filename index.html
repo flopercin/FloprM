@@ -1,634 +1,283 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>FloprG</title>
+    <title>3D Platform</title>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            touch-action: none;
-            font-family: Arial, sans-serif;
-        }
-        canvas { 
-            display: block; 
-        }
-        #mobile-ui {
-            position: fixed;
-            bottom: 20px;
-            width: 100%;
-            display: none;
-            justify-content: space-between;
-            padding: 0 20px;
-            box-sizing: border-box;
-        }
-        #joystick {
-            width: 100px;
-            height: 100px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            position: relative;
-        }
-        #joystick-handle {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 50%;
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #fullscreenBtn {
             position: absolute;
-            top: 30px;
-            left: 30px;
-        }
-        #jump-btn {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
             color: white;
-            font-size: 16px;
-        }
-        #pause-btn {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 40px;
-            height: 40px;
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            font-size: 20px;
-            cursor: pointer;
-            z-index: 100;
-            display: none;
-        }
-        #menu {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-            color: white;
-        }
-        .menu-title {
-            font-size: 48px;
-            margin-bottom: 30px;
-            color: #4CAF50;
-        }
-        .menu-btn {
-            width: 200px;
-            padding: 15px;
-            margin: 10px;
-            background: rgba(76, 175, 80, 0.7);
             border: none;
             border-radius: 5px;
-            color: white;
-            font-size: 18px;
             cursor: pointer;
-            transition: all 0.3s;
         }
-        .menu-btn:hover {
-            background: rgba(76, 175, 80, 1);
-        }
-        #settings-menu, #credits-menu {
-            display: none;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border-radius: 10px;
-            max-width: 500px;
-            width: 80%;
-        }
-        .back-btn {
-            background: rgba(244, 67, 54, 0.7) !important;
-        }
-        .back-btn:hover {
-            background: rgba(244, 67, 54, 1) !important;
-        }
-        #pause-menu {
+        #joystick {
+            position: absolute;
+            bottom: 100px;
+            left: 80px;
+            width: 80px;
+            height: 80px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 50%;
             display: none;
         }
-        .link {
-            color: #4CAF50;
-            text-decoration: none;
-            margin: 5px 0;
-            display: inline-block;
-        }
-        .link:hover {
-            text-decoration: underline;
-        }
-        .slider-container {
-            width: 100%;
-            margin: 15px 0;
-        }
-        .slider-container label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .slider {
-            width: 100%;
+        #joystickKnob {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            top: 20px;
+            left: 20px;
         }
     </style>
 </head>
 <body>
-    <button id="pause-btn">II</button>
-    
-    <div id="mobile-ui">
-        <div id="joystick">
-            <div id="joystick-handle"></div>
-        </div>
-        <div id="jump-btn">Прыжок</div>
-    </div>
-    
-    <div id="menu">
-        <div class="menu-title">FloprG</div>
-        <button class="menu-btn" id="play-btn">Играть</button>
-        <button class="menu-btn" id="settings-btn">Настройки</button>
-        <button class="menu-btn" id="credits-btn">Кредиты</button>
-    </div>
-    
-    <div id="settings-menu">
-        <h2>Настройки</h2>
-        <div class="slider-container">
-            <label for="sensitivity">Чувствительность мыши: <span id="sensitivity-value">50</span>%</label>
-            <input type="range" id="sensitivity" class="slider" min="10" max="200" value="50">
-        </div>
-        <div class="slider-container">
-            <label for="volume">Громкость: <span id="volume-value">50</span>%</label>
-            <input type="range" id="volume" class="slider" min="0" max="100" value="50">
-        </div>
-        <button class="menu-btn back-btn" id="settings-back-btn">Назад</button>
-    </div>
-    
-    <div id="credits-menu">
-        <h2>Кредиты</h2>
-        <p>Игра разработана для FloprG</p>
-        <p>Телеграм канал:</p>
-        <a href="https://t.me/FloprHub" class="link" target="_blank">https://t.me/FloprHub</a>
-        <p>YouTube:</p>
-        <a href="https://youtube.com/flopercin" class="link" target="_blank">https://youtube.com/flopercin</a>
-        <button class="menu-btn back-btn" id="credits-back-btn">Назад</button>
-    </div>
-    
-    <div id="pause-menu">
-        <h2>Пауза</h2>
-        <button class="menu-btn" id="resume-btn">Продолжить</button>
-        <button class="menu-btn back-btn" id="main-menu-btn">Главное меню</button>
-    </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
+    <canvas id="gameCanvas"></canvas>
+    <button id="fullscreenBtn">Fullscreen</button>
+    <div id="joystick"><div id="joystickKnob"></div></div>
+
     <script>
-        // Определяем мобильное устройство
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // Инициализация сцены, камеры и рендерера
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Голубое небо
-        
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
-        
-        // Переменные состояния игры
-        let gameStarted = false;
-        let gamePaused = false;
-        let controls;
-        let menuCamera;
-        let menuCameraAngle = 0;
-        
-        // Инициализация игры
-        function initGame() {
-            // Очистка сцены
-            while(scene.children.length > 0) { 
-                scene.remove(scene.children[0]); 
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const joystick = document.getElementById('joystick');
+        const joystickKnob = document.getElementById('joystickKnob');
+
+        let isMobile = false;
+        let joystickActive = false;
+        let joystickX = 0;
+        let joystickY = 0;
+        let joystickStartX = 0;
+        let joystickStartY = 0;
+        let joystickKnobX = 0;
+        let joystickKnobY = 0;
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const player = {
+            x: 0,
+            y: 1.6,
+            z: 0,
+            rotX: 0,
+            rotY: 0,
+            speed: 0.1
+        };
+
+        const platform = {
+            size: 20,
+            height: 0
+        };
+
+        const keys = {};
+        const mouse = { x: 0, y: 0, prevX: 0, prevY: 0, isDown: false };
+
+        function init() {
+            window.addEventListener('resize', resize);
+            document.addEventListener('keydown', keyDown);
+            document.addEventListener('keyup', keyUp);
+            canvas.addEventListener('mousedown', mouseDown);
+            canvas.addEventListener('mouseup', mouseUp);
+            canvas.addEventListener('mousemove', mouseMove);
+            canvas.addEventListener('touchstart', handleTouch, { passive: false });
+            canvas.addEventListener('touchmove', handleTouch, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd);
+            fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+            if ('ontouchstart' in window) {
+                isMobile = true;
+                joystick.style.display = 'block';
             }
-            
-            // Настройка камеры
-            camera.position.set(0, 2, 0);
-            
-            // Добавляем солнце (направленный свет)
-            const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-            sunLight.position.set(100, 100, 50);
-            sunLight.castShadow = true;
-            sunLight.shadow.mapSize.width = 2048;
-            sunLight.shadow.mapSize.height = 2048;
-            scene.add(sunLight);
-            
-            // Добавляем солнце как объект (сферу)
-            const sunGeometry = new THREE.SphereGeometry(2, 32, 32);
-            const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-            sun.position.set(20, 20, -20);
-            scene.add(sun);
-            
-            // Добавляем окружающий свет
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-            scene.add(ambientLight);
-            
-            // Создаем толстую платформу (3D коробка)
-            const floorGeometry = new THREE.BoxGeometry(20, 1, 20);
-            const floorMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x3a5f0b,
-                roughness: 0.8,
-                metalness: 0.2
-            });
-            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.position.y = -0.5; // Опускаем на половину высоты
-            floor.receiveShadow = true;
-            scene.add(floor);
-            
-            // Добавляем стену посередине
-            const wallGeometry = new THREE.BoxGeometry(15, 3, 1);
-            const wallMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x8B4513,
-                roughness: 0.9,
-                metalness: 0.1
-            });
-            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-            wall.position.set(0, 1, 0);
-            wall.castShadow = true;
-            wall.receiveShadow = true;
-            scene.add(wall);
-            
-            // Настройка управления (FPS-режим)
-            controls = new THREE.PointerLockControls(camera, document.body);
-            
-            // Переменные для движения и физики
-            const moveSpeed = 0.1;
-            const gravity = 0.02;
-            const jumpForce = 0.15;
-            let velocityY = 0;
-            let isJumping = false;
-            let isOnGround = false;
-            
-            // Границы платформы
-            const platformBounds = {
-                minX: -10,
-                maxX: 10,
-                minZ: -10,
-                maxZ: 10,
-                wall: {
-                    minX: -7.5,
-                    maxX: 7.5,
-                    minZ: -0.5,
-                    maxZ: 0.5
-                }
-            };
-            
-            // Движение с клавиатуры
-            const keys = {
-                w: false, a: false, s: false, d: false,
-                space: false
-            };
-            
-            // Мобильное управление
-            if (isMobile) {
-                document.getElementById('mobile-ui').style.display = 'flex';
-                
-                let joystickActive = false;
-                let joystickVector = new THREE.Vector2();
-                let mobileJump = false;
-                
-                const joystick = document.getElementById('joystick');
-                const joystickHandle = document.getElementById('joystick-handle');
-                const jumpBtn = document.getElementById('jump-btn');
-                
-                let joystickStartPos = { x: 0, y: 0 };
-                let joystickCurrentPos = { x: 0, y: 0 };
-                
-                joystick.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
+
+            resize();
+            loop();
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function keyDown(e) {
+            keys[e.key.toLowerCase()] = true;
+        }
+
+        function keyUp(e) {
+            keys[e.key.toLowerCase()] = false;
+        }
+
+        function mouseDown(e) {
+            mouse.isDown = true;
+            mouse.prevX = e.clientX;
+            mouse.prevY = e.clientY;
+        }
+
+        function mouseUp() {
+            mouse.isDown = false;
+        }
+
+        function mouseMove(e) {
+            if (mouse.isDown) {
+                const dx = e.clientX - mouse.prevX;
+                const dy = e.clientY - mouse.prevY;
+                player.rotY -= dx * 0.002;
+                player.rotX -= dy * 0.002;
+                player.rotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, player.rotX));
+                mouse.prevX = e.clientX;
+                mouse.prevY = e.clientY;
+            }
+        }
+
+        function handleTouch(e) {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const touchX = touch.clientX - rect.left;
+                const touchY = touch.clientY - rect.top;
+
+                if (touchX < canvas.width * 0.5) {
                     joystickActive = true;
-                    const rect = joystick.getBoundingClientRect();
-                    joystickStartPos = {
-                        x: rect.left + rect.width / 2,
-                        y: rect.top + rect.height / 2
-                    };
-                });
-                
-                document.addEventListener('touchmove', (e) => {
-                    if (!joystickActive) return;
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    joystickCurrentPos = { x: touch.clientX, y: touch.clientY };
-                    
-                    // Вычисляем вектор джойстика
-                    const deltaX = joystickCurrentPos.x - joystickStartPos.x;
-                    const deltaY = joystickCurrentPos.y - joystickStartPos.y;
-                    const distance = Math.min(Math.sqrt(deltaX * deltaX + deltaY * deltaY), 50);
-                    
-                    if (distance > 5) {
-                        const angle = Math.atan2(deltaY, deltaX);
-                        joystickVector.set(Math.cos(angle), Math.sin(angle)).multiplyScalar(distance / 50);
-                        
-                        // Перемещаем ручку джойстика
-                        joystickHandle.style.transform = `translate(${deltaX * 0.3}px, ${deltaY * 0.3}px)`;
-                    } else {
-                        joystickVector.set(0, 0);
-                        joystickHandle.style.transform = 'translate(0, 0)';
-                    }
-                });
-                
-                document.addEventListener('touchend', (e) => {
-                    if (!joystickActive) return;
-                    joystickActive = false;
-                    joystickVector.set(0, 0);
-                    joystickHandle.style.transform = 'translate(0, 0)';
-                });
-                
-                jumpBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    mobileJump = true;
-                });
-                
-                jumpBtn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    mobileJump = false;
-                });
-                
-                // Функция для мобильного управления
-                function handleMobileMovement() {
-                    const direction = new THREE.Vector3();
-                    const frontVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                    const sideVector = new THREE.Vector3(-1, 0, 0).applyQuaternion(camera.quaternion);
-                    
-                    // Движение вперед/назад
-                    if (joystickVector.y < -0.3) direction.add(frontVector);
-                    if (joystickVector.y > 0.3) direction.sub(frontVector);
-                    
-                    // Движение влево/вправо
-                    if (joystickVector.x < -0.3) direction.add(sideVector);
-                    if (joystickVector.x > 0.3) direction.sub(sideVector);
-                    
-                    // Нормализация и применение скорости
-                    if (direction.length() > 0) {
-                        direction.y = 0;
-                        direction.normalize();
-                        direction.multiplyScalar(moveSpeed);
-                    }
-                    
-                    // Проверка коллизий перед перемещением
-                    const newPosition = new THREE.Vector3().copy(controls.getObject().position).add(direction);
-                    if (!checkCollisions(newPosition)) {
-                        controls.moveRight(direction.x);
-                        controls.moveForward(-direction.z);
-                    }
-                    
-                    // Прыжок
-                    if (mobileJump && !isJumping && isOnGround) {
-                        velocityY = jumpForce;
-                        isJumping = true;
-                    }
-                }
-            }
-            
-            // Обработка клавиатуры
-            document.addEventListener('keydown', (e) => {
-                if (gamePaused) return;
-                
-                if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true;
-                if (e.code === 'Space') keys.space = true;
-                
-                // Пауза на кнопку ` (ё)
-                if (e.key === '`' || e.key === 'ё') {
-                    togglePause();
-                }
-            });
-            
-            document.addEventListener('keyup', (e) => {
-                if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
-                if (e.code === 'Space') keys.space = false;
-            });
-            
-            // Активация управления по клику
-            document.addEventListener('click', () => {
-                if (!gameStarted) return;
-                if (!controls.isLocked && !gamePaused) {
-                    controls.lock();
-                }
-            });
-            
-            // Проверка коллизий
-            function checkCollisions(newPosition) {
-                const playerSize = 0.5;
-                const playerHeight = 1.8;
-                
-                // Проверка падения с платформы
-                if (newPosition.x < platformBounds.minX || newPosition.x > platformBounds.maxX ||
-                    newPosition.z < platformBounds.minZ || newPosition.z > platformBounds.maxZ) {
-                    return true; // Игрок упал
-                }
-                
-                // Проверка столкновения со стеной
-                if (newPosition.x > platformBounds.wall.minX && 
-                    newPosition.x < platformBounds.wall.maxX &&
-                    newPosition.z > platformBounds.wall.minZ && 
-                    newPosition.z < platformBounds.wall.maxZ) {
-                    return true; // Коллизия со стеной
-                }
-                
-                return false; // Нет коллизий
-            }
-            
-            // Функция движения
-            function handleMovement() {
-                if (gamePaused) return;
-                
-                const direction = new THREE.Vector3();
-                const frontVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                const sideVector = new THREE.Vector3(-1, 0, 0).applyQuaternion(camera.quaternion);
-                
-                // Движение вперед/назад
-                if (keys.w) direction.add(frontVector);
-                if (keys.s) direction.sub(frontVector);
-                
-                // Движение влево/вправо
-                if (keys.a) direction.add(sideVector);
-                if (keys.d) direction.sub(sideVector);
-                
-                // Нормализация и применение скорости
-                if (direction.length() > 0) {
-                    direction.y = 0;
-                    direction.normalize();
-                    direction.multiplyScalar(moveSpeed);
-                }
-                
-                // Проверка коллизий перед перемещением
-                const newPosition = new THREE.Vector3().copy(controls.getObject().position).add(direction);
-                if (!checkCollisions(newPosition)) {
-                    controls.moveRight(direction.x);
-                    controls.moveForward(-direction.z);
-                }
-                
-                // Гравитация
-                const newYPosition = controls.getObject().position.y + velocityY;
-                
-                // Проверка, стоит ли игрок на земле или платформе
-                isOnGround = newYPosition <= 0;
-                
-                if (isOnGround) {
-                    controls.getObject().position.y = 0;
-                    velocityY = 0;
-                    isJumping = false;
-                    
-                    // Прыжок
-                    if ((keys.space || (isMobile && mobileJump)) && !isJumping) {
-                        velocityY = jumpForce;
-                        isJumping = true;
-                    }
+                    joystickStartX = joystick.offsetLeft + joystick.offsetWidth / 2;
+                    joystickStartY = joystick.offsetTop + joystick.offsetHeight / 2;
+                    joystickX = touchX;
+                    joystickY = touchY;
+                    updateJoystick();
                 } else {
-                    // Применяем гравитацию
-                    velocityY -= gravity;
-                }
-                
-                // Обновляем позицию по Y
-                controls.getObject().position.y += velocityY;
-                
-                // Проверка падения с платформы
-                if (controls.getObject().position.y < -10) {
-                    // Респавн при падении
-                    controls.getObject().position.set(0, 2, 0);
-                    velocityY = 0;
+                    mouse.isDown = true;
+                    mouse.prevX = touchX;
+                    mouse.prevY = touchY;
                 }
             }
-            
-            // Игровой цикл
-            function gameLoop() {
-                if (!gameStarted || gamePaused) return;
-                
-                requestAnimationFrame(gameLoop);
-                
-                if (isMobile) {
-                    handleMobileMovement();
-                } else {
-                    handleMovement();
-                }
-                
-                renderer.render(scene, camera);
-            }
-            
-            // Запуск игры
-            gameStarted = true;
-            document.getElementById('pause-btn').style.display = 'block';
-            gameLoop();
         }
-        
-        // Меню камеры
-        function initMenuCamera() {
-            menuCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            menuCamera.position.set(15, 10, 15);
-            menuCamera.lookAt(0, 0, 0);
-            
-            function animateMenu() {
-                if (gameStarted) return;
-                
-                requestAnimationFrame(animateMenu);
-                
-                menuCameraAngle += 0.002;
-                menuCamera.position.x = 20 * Math.cos(menuCameraAngle);
-                menuCamera.position.z = 20 * Math.sin(menuCameraAngle);
-                menuCamera.lookAt(0, 0, 0);
-                
-                renderer.render(scene, menuCamera);
-            }
-            
-            animateMenu();
+
+        function handleTouchEnd() {
+            joystickActive = false;
+            joystickKnob.style.transform = 'translate(20px, 20px)';
+            mouse.isDown = false;
         }
-        
-        // Пауза
-        function togglePause() {
-            if (!gameStarted) return;
-            
-            gamePaused = !gamePaused;
-            
-            if (gamePaused) {
-                controls.unlock();
-                document.getElementById('pause-menu').style.display = 'flex';
+
+        function updateJoystick() {
+            if (!joystickActive) return;
+
+            const dx = joystickX - joystickStartX;
+            const dy = joystickY - joystickStartY;
+            const distance = Math.min(30, Math.sqrt(dx*dx + dy*dy));
+            const angle = Math.atan2(dy, dx);
+
+            joystickKnobX = Math.cos(angle) * distance;
+            joystickKnobY = Math.sin(angle) * distance;
+            joystickKnob.style.transform = `translate(${joystickKnobX + 20}px, ${joystickKnobY + 20}px)`;
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                canvas.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                });
             } else {
-                document.getElementById('pause-menu').style.display = 'none';
-                if (controls.isLocked === false) {
-                    controls.lock();
-                }
+                document.exitFullscreen();
             }
         }
-        
-        // Обработчики кнопок
-        document.getElementById('play-btn').addEventListener('click', () => {
-            document.getElementById('menu').style.display = 'none';
-            initGame();
-        });
-        
-        document.getElementById('settings-btn').addEventListener('click', () => {
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('settings-menu').style.display = 'block';
-        });
-        
-        document.getElementById('credits-btn').addEventListener('click', () => {
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('credits-menu').style.display = 'block';
-        });
-        
-        document.getElementById('settings-back-btn').addEventListener('click', () => {
-            document.getElementById('settings-menu').style.display = 'none';
-            document.getElementById('menu').style.display = 'flex';
-        });
-        
-        document.getElementById('credits-back-btn').addEventListener('click', () => {
-            document.getElementById('credits-menu').style.display = 'none';
-            document.getElementById('menu').style.display = 'flex';
-        });
-        
-        document.getElementById('pause-btn').addEventListener('click', togglePause);
-        
-        document.getElementById('resume-btn').addEventListener('click', togglePause);
-        
-        document.getElementById('main-menu-btn').addEventListener('click', () => {
-            document.getElementById('pause-menu').style.display = 'none';
-            document.getElementById('menu').style.display = 'flex';
-            gameStarted = false;
-            gamePaused = false;
-            document.getElementById('pause-btn').style.display = 'none';
-            if (controls) {
-                controls.unlock();
+
+        function movePlayer() {
+            let moveX = 0;
+            let moveZ = 0;
+
+            if (joystickActive) {
+                moveX = joystickKnobX / 30;
+                moveZ = joystickKnobY / 30;
+            } else {
+                if (keys['w'] || keys['ц']) moveZ = -1;
+                if (keys['s'] || keys['ы']) moveZ = 1;
+                if (keys['a'] || keys['ф']) moveX = -1;
+                if (keys['d'] || keys['в']) moveX = 1;
             }
-        });
-        
-        // Настройки
-        document.getElementById('sensitivity').addEventListener('input', (e) => {
-            document.getElementById('sensitivity-value').textContent = e.target.value;
-            if (controls) {
-                controls.pointerSpeed = e.target.value / 50;
+
+            const speed = player.speed;
+            const sinY = Math.sin(player.rotY);
+            const cosY = Math.cos(player.rotY);
+
+            player.x += (moveZ * sinY + moveX * cosY) * speed;
+            player.z += (moveZ * cosY - moveX * sinY) * speed;
+
+            const halfSize = platform.size / 2;
+            player.x = Math.max(-halfSize, Math.min(halfSize, player.x));
+            player.z = Math.max(-halfSize, Math.min(halfSize, player.z));
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const horizon = canvas.height / 2;
+            const scale = canvas.height / 2;
+
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, horizon);
+
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, horizon, canvas.width, canvas.height - horizon);
+
+            const gridSize = platform.size;
+            const gridStep = 1;
+            const gridColor = '#555';
+
+            for (let x = -gridSize; x <= gridSize; x += gridStep) {
+                drawLine(x, 0, -gridSize, x, 0, gridSize, gridColor);
             }
-        });
-        
-        document.getElementById('volume').addEventListener('input', (e) => {
-            document.getElementById('volume-value').textContent = e.target.value;
-        });
-        
-        // Обработка изменения размера окна
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            if (menuCamera) {
-                menuCamera.aspect = window.innerWidth / window.innerHeight;
-                menuCamera.updateProjectionMatrix();
+
+            for (let z = -gridSize; z <= gridSize; z += gridStep) {
+                drawLine(-gridSize, 0, z, gridSize, 0, z, gridColor);
             }
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        // Инициализация меню
-        initMenuCamera();
+        }
+
+        function drawLine(x1, y1, z1, x2, y2, z2, color) {
+            const p1 = projectPoint(x1 - player.x, y1 - player.y, z1 - player.z);
+            const p2 = projectPoint(x2 - player.x, y2 - player.y, z2 - player.z);
+
+            if (p1.z > 0 && p2.z > 0) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+        }
+
+        function projectPoint(x, y, z) {
+            const cosX = Math.cos(player.rotX);
+            const sinX = Math.sin(player.rotX);
+            const cosY = Math.cos(player.rotY);
+            const sinY = Math.sin(player.rotY);
+
+            const rotYx = x * cosY - z * sinY;
+            const rotYz = x * sinY + z * cosY;
+
+            const rotXy = y * cosX - rotYz * sinX;
+            const rotXz = y * sinX + rotYz * cosX;
+
+            const scale = canvas.height / 2;
+            const projectedX = rotYx / rotXz * scale + canvas.width / 2;
+            const projectedY = -rotXy / rotXz * scale + canvas.height / 2;
+
+            return { x: projectedX, y: projectedY, z: rotXz };
+        }
+
+        function loop() {
+            movePlayer();
+            drawScene();
+            requestAnimationFrame(loop);
+        }
+
+        init();
     </script>
 </body>
 </html>

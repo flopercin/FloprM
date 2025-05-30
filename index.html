@@ -2,16 +2,81 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>3D Платформа (FPS)</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            touch-action: none;
+        }
+        canvas { 
+            display: block; 
+        }
+        #mobile-ui {
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            display: none;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        #joystick {
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            position: relative;
+        }
+        #joystick-handle {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            position: absolute;
+            top: 30px;
+            left: 30px;
+        }
+        #jump-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: Arial;
+            font-size: 16px;
+        }
+        #instructions {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            text-align: center;
+            font-family: Arial;
+        }
     </style>
 </head>
 <body>
+    <div id="instructions">Кликните на экран для начала игры</div>
+    <div id="mobile-ui">
+        <div id="joystick">
+            <div id="joystick-handle"></div>
+        </div>
+        <div id="jump-btn">Прыжок</div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
     <script>
+        // Определяем мобильное устройство
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         // Инициализация сцены, камеры и рендерера
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB); // Голубое небо
@@ -21,71 +86,269 @@
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
         
-        // Добавляем освещение
-        const light = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(light);
+        // Добавляем солнце (направленный свет)
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+        sunLight.position.set(100, 100, 50);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        scene.add(sunLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(1, 1, 1);
-        scene.add(directionalLight);
+        // Добавляем солнце как объект (сферу)
+        const sunGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        sun.position.set(20, 20, -20);
+        scene.add(sun);
         
-        // Создаем платформу (пол)
-        const floorGeometry = new THREE.PlaneGeometry(20, 20);
+        // Добавляем окружающий свет
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+        
+        // Создаем толстую платформу (3D коробка)
+        const floorGeometry = new THREE.BoxGeometry(20, 1, 20);
         const floorMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x3a5f0b,
             roughness: 0.8,
             metalness: 0.2
         });
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-        floor.rotation.x = -Math.PI / 2; // Поворачиваем горизонтально
+        floor.position.y = -0.5; // Опускаем на половину высоты
+        floor.receiveShadow = true;
         scene.add(floor);
         
-        // Добавляем несколько кубов для наглядности
+        // Добавляем несколько кубов с коллизиями
+        const cubes = [];
         const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const cubeMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xff0000,
+            roughness: 0.7,
+            metalness: 0.3
+        });
         
         for (let i = 0; i < 5; i++) {
             const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-            cube.position.x = Math.random() * 10 - 5;
-            cube.position.z = Math.random() * 10 - 5;
+            cube.position.x = Math.random() * 15 - 7.5;
+            cube.position.z = Math.random() * 15 - 7.5;
             cube.position.y = 0.5;
+            cube.castShadow = true;
+            cube.receiveShadow = true;
+            
+            // Сохраняем параметры для коллизий
+            cube.userData = {
+                width: 1,
+                height: 1,
+                depth: 1
+            };
+            
             scene.add(cube);
+            cubes.push(cube);
         }
         
         // Настройка управления (FPS-режим)
         const controls = new THREE.PointerLockControls(camera, document.body);
         
-        document.addEventListener('click', () => {
-            controls.lock(); // Блокировка курсора при клике
-        });
-        
-        // Движение с клавиатуры
+        // Переменные для движения и физики
         const moveSpeed = 0.1;
-        const keys = {
-            w: false, a: false, s: false, d: false
+        const gravity = 0.02;
+        const jumpForce = 0.15;
+        let velocityY = 0;
+        let isJumping = false;
+        let isOnGround = false;
+        
+        // Границы платформы
+        const platformBounds = {
+            minX: -10,
+            maxX: 10,
+            minZ: -10,
+            maxZ: 10
         };
         
+        // Движение с клавиатуры
+        const keys = {
+            w: false, a: false, s: false, d: false,
+            space: false
+        };
+        
+        // Мобильное управление
+        let joystickActive = false;
+        let joystickVector = new THREE.Vector2();
+        let mobileJump = false;
+        
+        if (isMobile) {
+            document.getElementById('mobile-ui').style.display = 'flex';
+            document.getElementById('instructions').textContent = 'Коснитесь экрана для начала игры';
+            
+            // Обработка джойстика
+            const joystick = document.getElementById('joystick');
+            const joystickHandle = document.getElementById('joystick-handle');
+            const jumpBtn = document.getElementById('jump-btn');
+            
+            let joystickStartPos = { x: 0, y: 0 };
+            let joystickCurrentPos = { x: 0, y: 0 };
+            
+            joystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                joystickActive = true;
+                const rect = joystick.getBoundingClientRect();
+                joystickStartPos = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
+            });
+            
+            document.addEventListener('touchmove', (e) => {
+                if (!joystickActive) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                joystickCurrentPos = { x: touch.clientX, y: touch.clientY };
+                
+                // Вычисляем вектор джойстика
+                const deltaX = joystickCurrentPos.x - joystickStartPos.x;
+                const deltaY = joystickCurrentPos.y - joystickStartPos.y;
+                const distance = Math.min(Math.sqrt(deltaX * deltaX + deltaY * deltaY), 50);
+                
+                if (distance > 5) {
+                    const angle = Math.atan2(deltaY, deltaX);
+                    joystickVector.set(Math.cos(angle), Math.sin(angle)).multiplyScalar(distance / 50);
+                    
+                    // Перемещаем ручку джойстика
+                    joystickHandle.style.transform = `translate(${deltaX * 0.3}px, ${deltaY * 0.3}px)`;
+                } else {
+                    joystickVector.set(0, 0);
+                    joystickHandle.style.transform = 'translate(0, 0)';
+                }
+            });
+            
+            document.addEventListener('touchend', (e) => {
+                if (!joystickActive) return;
+                joystickActive = false;
+                joystickVector.set(0, 0);
+                joystickHandle.style.transform = 'translate(0, 0)';
+            });
+            
+            jumpBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                mobileJump = true;
+            });
+            
+            jumpBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                mobileJump = false;
+            });
+        }
+        
+        // Обработка клавиатуры
         document.addEventListener('keydown', (e) => {
-            if (e.key in keys) keys[e.key] = true;
+            if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true;
+            if (e.code === 'Space') keys.space = true;
         });
         
         document.addEventListener('keyup', (e) => {
-            if (e.key in keys) keys[e.key] = false;
+            if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
+            if (e.code === 'Space') keys.space = false;
         });
+        
+        // Активация управления по клику
+        document.addEventListener('click', () => {
+            if (!controls.isLocked) {
+                controls.lock();
+                document.getElementById('instructions').style.display = 'none';
+            }
+        });
+        
+        // Проверка коллизий
+        function checkCollisions(newPosition) {
+            const playerSize = 0.5;
+            const playerHeight = 1.8;
+            
+            // Проверка падения с платформы
+            if (newPosition.x < platformBounds.minX || newPosition.x > platformBounds.maxX ||
+                newPosition.z < platformBounds.minZ || newPosition.z > platformBounds.maxZ) {
+                return true; // Игрок упал
+            }
+            
+            // Проверка столкновений с кубами
+            for (const cube of cubes) {
+                const cubePos = cube.position;
+                const cubeSize = cube.userData;
+                
+                if (Math.abs(newPosition.x - cubePos.x) < (playerSize + cubeSize.width/2) &&
+                    Math.abs(newPosition.z - cubePos.z) < (playerSize + cubeSize.depth/2) &&
+                    newPosition.y < (cubePos.y + cubeSize.height) && 
+                    (newPosition.y + playerHeight) > cubePos.y) {
+                    return true; // Коллизия с кубом
+                }
+            }
+            
+            return false; // Нет коллизий
+        }
         
         // Анимация
         function animate() {
             requestAnimationFrame(animate);
             
-            // Движение вперед/назад
-            if (keys.w) controls.moveForward(moveSpeed);
-            if (keys.s) controls.moveForward(-moveSpeed);
-            
-            // Движение влево/вправо
-            if (keys.a) controls.moveRight(-moveSpeed);
-            if (keys.d) controls.moveRight(moveSpeed);
+            if (controls.isLocked) {
+                const direction = new THREE.Vector3();
+                const frontVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                const sideVector = new THREE.Vector3(-1, 0, 0).applyQuaternion(camera.quaternion);
+                
+                // Движение вперед/назад
+                if (keys.w || joystickVector.y < -0.3) direction.add(frontVector);
+                if (keys.s || joystickVector.y > 0.3) direction.sub(frontVector);
+                
+                // Движение влево/вправо
+                if (keys.a || joystickVector.x < -0.3) direction.add(sideVector);
+                if (keys.d || joystickVector.x > 0.3) direction.sub(sideVector);
+                
+                // Нормализация и применение скорости
+                if (direction.length() > 0) {
+                    direction.y = 0;
+                    direction.normalize();
+                    direction.multiplyScalar(moveSpeed);
+                }
+                
+                // Проверка коллизий перед перемещением
+                const newPosition = new THREE.Vector3().copy(controls.getObject().position).add(direction);
+                if (!checkCollisions(newPosition)) {
+                    controls.moveRight(direction.x);
+                    controls.moveForward(-direction.z);
+                }
+                
+                // Гравитация и прыжки
+                const newYPosition = controls.getObject().position.y + velocityY;
+                
+                // Проверка, стоит ли игрок на земле или платформе
+                isOnGround = newYPosition <= 0;
+                
+                if (isOnGround) {
+                    controls.getObject().position.y = 0;
+                    velocityY = 0;
+                    isJumping = false;
+                    
+                    // Прыжок
+                    if ((keys.space || mobileJump) && !isJumping) {
+                        velocityY = jumpForce;
+                        isJumping = true;
+                    }
+                } else {
+                    // Применяем гравитацию
+                    velocityY -= gravity;
+                }
+                
+                // Обновляем позицию по Y
+                controls.getObject().position.y += velocityY;
+                
+                // Проверка падения с платформы
+                if (controls.getObject().position.y < -10) {
+                    // Респавн при падении
+                    controls.getObject().position.set(0, 2, 0);
+                    velocityY = 0;
+                }
+            }
             
             renderer.render(scene, camera);
         }

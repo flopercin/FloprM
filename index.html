@@ -1,242 +1,150 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Platform with Three.js</title>
+    <title>3D Platform</title>
     <style>
         body { margin: 0; overflow: hidden; }
-        #fullscreenBtn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            z-index: 100;
-        }
-        #joystick {
-            position: absolute;
-            bottom: 100px;
-            left: 80px;
-            width: 80px;
-            height: 80px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 50%;
-            display: none;
-            z-index: 100;
-        }
-        #joystickKnob {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background: rgba(255,255,255,0.5);
-            border-radius: 50%;
-            top: 20px;
-            left: 20px;
-        }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <div id="container"></div>
-    <button id="fullscreenBtn">Fullscreen</button>
-    <div id="joystick"><div id="joystickKnob"></div></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134/examples/js/controls/PointerLockControls.js"></script>
     <script>
-        let container, camera, scene, renderer, controls;
-        let isMobile = false;
-        let joystickActive = false;
-        let joystickX = 0;
-        let joystickY = 0;
-        let joystickStartX = 0;
-        let joystickStartY = 0;
-        let joystickKnobX = 0;
-        let joystickKnobY = 0;
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        const platformSize = 20;
-
-        init();
-        animate();
+        let camera, scene, renderer, controls;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
 
         function init() {
-            container = document.getElementById('container');
-            
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.y = 1.6;
-            
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.FogExp2(0x87CEEB, 0.002);
-            
-            const platformGeometry = new THREE.PlaneGeometry(platformSize, platformSize);
-            const platformMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x228B22,
-                side: THREE.DoubleSide
-            });
-            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-            platform.rotation.x = -Math.PI / 2;
-            scene.add(platform);
-            
-            const gridHelper = new THREE.GridHelper(platformSize, platformSize);
-            scene.add(gridHelper);
-            
-            const ambientLight = new THREE.AmbientLight(0x404040);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
-            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = 2;
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            container.appendChild(renderer.domElement);
-            
-            controls = new THREE.PointerLockControls(camera, container);
-            
-            document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-            
-            if ('ontouchstart' in window) {
-                isMobile = true;
-                document.getElementById('joystick').style.display = 'block';
-                
-                const joystick = document.getElementById('joystick');
-                const joystickKnob = document.getElementById('joystickKnob');
-                
-                container.addEventListener('touchstart', function(e) {
-                    if (e.touches.length === 1) {
-                        const touch = e.touches[0];
-                        const rect = container.getBoundingClientRect();
-                        const touchX = touch.clientX - rect.left;
-                        const touchY = touch.clientY - rect.top;
-                        
-                        if (touchX < window.innerWidth * 0.5) {
-                            joystickActive = true;
-                            joystickStartX = joystick.offsetLeft + joystick.offsetWidth / 2;
-                            joystickStartY = joystick.offsetTop + joystick.offsetHeight / 2;
-                            joystickX = touchX;
-                            joystickY = touchY;
-                            updateJoystick();
-                        }
-                    }
-                });
-                
-                container.addEventListener('touchmove', function(e) {
-                    e.preventDefault();
-                    if (e.touches.length === 1 && joystickActive) {
-                        const touch = e.touches[0];
-                        const rect = container.getBoundingClientRect();
-                        joystickX = touch.clientX - rect.left;
-                        joystickY = touch.clientY - rect.top;
-                        updateJoystick();
-                    }
-                });
-                
-                container.addEventListener('touchend', function() {
-                    joystickActive = false;
-                    joystickKnob.style.transform = 'translate(20px, 20px)';
-                    moveForward = moveBackward = moveLeft = moveRight = false;
-                });
-            } else {
-                document.addEventListener('keydown', onKeyDown);
-                document.addEventListener('keyup', onKeyUp);
-                container.addEventListener('click', function() {
-                    controls.lock();
-                });
-            }
-            
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.PointerLockControls(camera, renderer.domElement);
+            controls.pointerSpeed = 0.5;
+
+            document.addEventListener('click', () => {
+                controls.lock();
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                }
+            });
+
+            let platformGeometry = new THREE.BoxGeometry(50, 0.2, 50);
+            let platformMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            let platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.position.y = -0.1;
+            scene.add(platform);
+
+            let ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            let directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(0, 10, 0);
+            scene.add(directionalLight);
+
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
             window.addEventListener('resize', onWindowResize);
+            document.addEventListener('touchstart', onTouchStart);
+            document.addEventListener('touchmove', onTouchMove);
+
+            animate();
         }
-        
-        function updateJoystick() {
-            const dx = joystickX - joystickStartX;
-            const dy = joystickY - joystickStartY;
-            const distance = Math.min(30, Math.sqrt(dx*dx + dy*dy));
-            const angle = Math.atan2(dy, dx);
-            
-            joystickKnobX = Math.cos(angle) * distance;
-            joystickKnobY = Math.sin(angle) * distance;
-            document.getElementById('joystickKnob').style.transform = `translate(${joystickKnobX + 20}px, ${joystickKnobY + 20}px)`;
-            
-            moveForward = joystickKnobY < -10;
-            moveBackward = joystickKnobY > 10;
-            moveLeft = joystickKnobX < -10;
-            moveRight = joystickKnobX > 10;
-        }
-        
+
         function onKeyDown(event) {
-            switch (event.key.toLowerCase()) {
-                case 'w': case 'ц': moveForward = true; break;
-                case 'a': case 'ф': moveLeft = true; break;
-                case 's': case 'ы': moveBackward = true; break;
-                case 'd': case 'в': moveRight = true; break;
+            switch (event.code) {
+                case 'ArrowUp':
+                case 'KeyW': moveForward = true; break;
+                case 'ArrowLeft':
+                case 'KeyA': moveLeft = true; break;
+                case 'ArrowDown':
+                case 'KeyS': moveBackward = true; break;
+                case 'ArrowRight':
+                case 'KeyD': moveRight = true; break;
             }
         }
-        
+
         function onKeyUp(event) {
-            switch (event.key.toLowerCase()) {
-                case 'w': case 'ц': moveForward = false; break;
-                case 'a': case 'ф': moveLeft = false; break;
-                case 's': case 'ы': moveBackward = false; break;
-                case 'd': case 'в': moveRight = false; break;
+            switch (event.code) {
+                case 'ArrowUp':
+                case 'KeyW': moveForward = false; break;
+                case 'ArrowLeft':
+                case 'KeyA': moveLeft = false; break;
+                case 'ArrowDown':
+                case 'KeyS': moveBackward = false; break;
+                case 'ArrowRight':
+                case 'KeyD': moveRight = false; break;
             }
         }
-        
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                container.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-        
+
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
-        
+
+        let touchStartX = 0, touchStartY = 0;
+        let touchLookX = 0, touchLookY = 0;
+
+        function onTouchStart(event) {
+            if (event.touches.length === 1) {
+                touchStartX = event.touches[0].pageX;
+                touchStartY = event.touches[0].pageY;
+            }
+        }
+
+        function onTouchMove(event) {
+            if (event.touches.length === 1) {
+                touchLookX = event.touches[0].pageX - touchStartX;
+                touchLookY = event.touches[0].pageY - touchStartY;
+                controls.getObject().rotation.y -= touchLookX * 0.005;
+                controls.getObject().children[0].rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, controls.getObject().children[0].rotation.x - touchLookY * 0.005));
+                touchStartX = event.touches[0].pageX;
+                touchStartY = event.touches[0].pageY;
+
+                moveForward = Math.abs(touchLookY) > 50 && touchLookY < 0;
+                moveBackward = Math.abs(touchLookY) > 50 && touchLookY > 0;
+                moveLeft = Math.abs(touchLookX) > 50 && touchLookX < 0;
+                moveRight = Math.abs(touchLookX) > 50 && touchLookX > 0;
+            }
+        }
+
         function animate() {
             requestAnimationFrame(animate);
-            
-            if (controls.isLocked || isMobile) {
-                const delta = 0.1;
-                
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-                
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize();
-                
-                if (moveForward || moveBackward) velocity.z -= direction.z * 5.0 * delta;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 5.0 * delta;
-                
-                if (isMobile) {
-                    controls.moveRight(-velocity.x * delta);
-                    controls.moveForward(-velocity.z * delta);
-                } else {
-                    controls.moveRight(velocity.x * delta);
-                    controls.moveForward(velocity.z * delta);
-                }
-                
-                const halfSize = platformSize / 2;
-                camera.position.x = Math.max(-halfSize, Math.min(halfSize, camera.position.x));
-                camera.position.z = Math.max(-halfSize, Math.min(halfSize, camera.position.z));
-            }
-            
+            let time = performance.now();
+            let delta = (time - prevTime) / 1000;
+
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+
+            controls.moveRight(-velocity.x * delta);
+            controls.moveForward(-velocity.z * delta);
+
+            camera.position.y = 2;
+
             renderer.render(scene, camera);
+            prevTime = time;
         }
+
+        init();
     </script>
 </body>
 </html>

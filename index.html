@@ -1,159 +1,95 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Platform</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            width: 100%;
-            height: 100%;
-        }
-        canvas {
-            display: block;
-        }
-        #joystickWrapper {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            width: 100px;
-            height: 100px;
-            z-index: 10;
-        }
-        #joystick {
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            position: relative;
-        }
-        #joystickKnob {
-            width: 50%;
-            height: 50%;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 50%;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
+        body { margin: 0; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <div id="joystickWrapper">
-        <div id="joystick">
-            <div id="joystickKnob"></div>
-        </div>
-    </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.8.7/nipplejs.min.js"></script>
     <script>
-        let scene = new THREE.Scene();
-        let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        let renderer = new THREE.WebGLRenderer();
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        let platformGeometry = new THREE.BoxGeometry(10, 0.2, 10);
-        let platformMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        let platform = new THREE.Mesh(platformGeometry, platformMaterial);
+        const geometry = new THREE.PlaneGeometry(100, 100);
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+        const platform = new THREE.Mesh(geometry, material);
+        platform.rotation.x = Math.PI / 2;
         scene.add(platform);
-
-        camera.position.set(0, 1, 5);
 
         let moveForward = false;
         let moveBackward = false;
         let moveLeft = false;
         let moveRight = false;
-        let velocity = new THREE.Vector3();
-        let direction = new THREE.Vector3();
-        let moveSpeed =Hopefully;
-        let pointerControls = new THREE.PointerLockControls(camera, renderer.domElement);
 
-        document.addEventListener('pointerdown', () => {
-            document.body.requestPointerLock();
-        });
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        document.addEventListener('keydown', (event) => {
+        const onKeyDown = (event) => {
             switch (event.code) {
                 case 'KeyW': moveForward = true; break;
                 case 'KeyS': moveBackward = true; break;
                 case 'KeyA': moveLeft = true; break;
                 case 'KeyD': moveRight = true; break;
             }
-        });
+        };
 
-        document.addEventListener('keyup', (event) => {
+        const onKeyUp = (event) => {
             switch (event.code) {
                 case 'KeyW': moveForward = false; break;
                 case 'KeyS': moveBackward = false; break;
                 case 'KeyA': moveLeft = false; break;
                 case 'KeyD': moveRight = false; break;
             }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+
+        const joystick = nipplejs.create({
+            zone: document.body,
+            mode: 'static',
+            position: { left: '50%', top: '50%' },
+            color: 'blue'
         });
 
-        let joystickWrapper = document.getElementById('joystickWrapper');
-        let joystickKnob = document.getElementById('joystickKnob');
-        let isJoystickActive = false;
-        let joystickStart = { x: 0, y: 0 };
-        let joystickDelta = { x: 0, y: 0 };
-
-        joystickWrapper.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            isJoystickActive = true;
-            let touch = e.touches[0];
-            joystickStart.x = touch.clientX;
-            joystickStart.y = touch.clientY;
-            joystickKnob.style.transition = 'none';
-        });
-
-        joystickWrapper.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (isJoystickActive) {
-                let touch = e.touches[0];
-                let dx = touch.clientX - joystickStart.x;
-                let dy = touch.clientY - joystickStart.y;
-                let max = 50;
-                dx = Math.max(Math.min(dx, max), -max);
-                dy = Math.max(Math.min(dy, max), -max);
-                joystickDelta.x = dx / max;
-                joystickDelta.y = dy / max;
-                joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        joystick.on('move', (evt, data) => {
+            const direction = data.direction;
+            if (direction) {
+                moveForward = direction.y === 'up';
+                moveBackward = direction.y === 'down';
+                moveLeft = direction.x === 'left';
+                moveRight = direction.x === 'right';
             }
         });
 
-        joystickWrapper.addEventListener('touchend', () => {
-            isJoystickActive = false;
-            joystickDelta.x = 0;
-            joystickDelta.y = 0;
-            joystickKnob.style.transition = '0.2s';
-            joystickKnob.style.transform = 'translate(-50%, -50%)';
+        joystick.on('end', () => {
+            moveForward = false;
+            moveBackward = false;
+            moveLeft = false;
+            moveRight = false;
         });
+
+        const speed = 0.1;
 
         function animate() {
             requestAnimationFrame(animate);
-            velocity.x *= 0.9;
-            velocity.z *= 0.9;
-            direction.z = Number(moveForward) - Number(moveBackward) + joystickDelta.y;
-            direction.x = Number(moveRight) - Number(moveLeft) + joystickDelta.x;
-            direction.normalize();
-            velocity.x += direction.x * moveSpeed;
-            velocity.z += direction.z * moveSpeed;
-            camera.position.x += velocity.x;
-            camera.position.z += velocity.z;
+
+            if (moveForward) camera.position.z -= speed;
+            if (moveBackward) camera.position.z += speed;
+            if (moveLeft) camera.position.x -= speed;
+            if (moveRight) camera.position.x += speed;
+
             renderer.render(scene, camera);
         }
 
-        document.body.requestFullscreen();
         animate();
+
+        document.body.requestFullscreen();
     </script>
 </body>
 </html>

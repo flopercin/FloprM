@@ -1,95 +1,121 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { margin: 0; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>3D FPS Platform</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+    }
+    #joystickContainer {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 100px;
+      height: 100px;
+      touch-action: none;
+    }
+  </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.8.7/nipplejs.min.js"></script>
-    <script>
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+  <div id="joystickContainer"></div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.1/examples/js/controls/PointerLockControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
+  <script>
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    document.body.appendChild(renderer.domElement)const light = new THREE.DirectionalLight(0xffffff, 1)
+light.position.set(5, 10, 7.5)
+scene.add(light)
 
-        const geometry = new THREE.PlaneGeometry(100, 100);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
-        const platform = new THREE.Mesh(geometry, material);
-        platform.rotation.x = Math.PI / 2;
-        scene.add(platform);
+const ambientLight = new THREE.AmbientLight(0x404040)
+scene.add(ambientLight)
 
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
+const platform = new THREE.Mesh(
+  new THREE.BoxGeometry(100, 1, 100),
+  new THREE.MeshStandardMaterial({ color: 0x555555 })
+)
+platform.position.y = -1
+scene.add(platform)
 
-        const onKeyDown = (event) => {
-            switch (event.code) {
-                case 'KeyW': moveForward = true; break;
-                case 'KeyS': moveBackward = true; break;
-                case 'KeyA': moveLeft = true; break;
-                case 'KeyD': moveRight = true; break;
-            }
-        };
+const controls = new THREE.PointerLockControls(camera, renderer.domElement)
+document.body.addEventListener('click', () => controls.lock())
 
-        const onKeyUp = (event) => {
-            switch (event.code) {
-                case 'KeyW': moveForward = false; break;
-                case 'KeyS': moveBackward = false; break;
-                case 'KeyA': moveLeft = false; break;
-                case 'KeyD': moveRight = false; break;
-            }
-        };
+const velocity = new THREE.Vector3()
+const direction = new THREE.Vector3()
+const move = { forward: false, backward: false, left: false, right: false }
+const speed = 5
 
-        document.addEventListener('keydown', onKeyDown);
-        document.addEventListener('keyup', onKeyUp);
+document.addEventListener('keydown', e => {
+  if (e.code === 'KeyW') move.forward = true
+  if (e.code === 'KeyS') move.backward = true
+  if (e.code === 'KeyA') move.left = true
+  if (e.code === 'KeyD') move.right = true
+})
 
-        const joystick = nipplejs.create({
-            zone: document.body,
-            mode: 'static',
-            position: { left: '50%', top: '50%' },
-            color: 'blue'
-        });
+document.addEventListener('keyup', e => {
+  if (e.code === 'KeyW') move.forward = false
+  if (e.code === 'KeyS') move.backward = false
+  if (e.code === 'KeyA') move.left = false
+  if (e.code === 'KeyD') move.right = false
+})
 
-        joystick.on('move', (evt, data) => {
-            const direction = data.direction;
-            if (direction) {
-                moveForward = direction.y === 'up';
-                moveBackward = direction.y === 'down';
-                moveLeft = direction.x === 'left';
-                moveRight = direction.x === 'right';
-            }
-        });
+const joystick = nipplejs.create({
+  zone: document.getElementById('joystickContainer'),
+  mode: 'static',
+  position: { left: '50px', bottom: '50px' },
+  color: 'white'
+})
 
-        joystick.on('end', () => {
-            moveForward = false;
-            moveBackward = false;
-            moveLeft = false;
-            moveRight = false;
-        });
+joystick.on('move', (evt, data) => {
+  const angle = data.angle.degree
+  const distance = data.distance / 50
+  move.forward = angle >= 45 && angle < 135
+  move.backward = angle >= 225 && angle < 315
+  move.left = angle >= 135 && angle < 225
+  move.right = angle < 45 || angle >= 315
+})
 
-        const speed = 0.1;
+joystick.on('end', () => {
+  move.forward = move.backward = move.left = move.right = false
+})
 
-        function animate() {
-            requestAnimationFrame(animate);
+camera.position.y = 1.6
 
-            if (moveForward) camera.position.z -= speed;
-            if (moveBackward) camera.position.z += speed;
-            if (moveLeft) camera.position.x -= speed;
-            if (moveRight) camera.position.x += speed;
+function animate() {
+  requestAnimationFrame(animate)
 
-            renderer.render(scene, camera);
-        }
+  direction.z = Number(move.forward) - Number(move.backward)
+  direction.x = Number(move.right) - Number(move.left)
+  direction.normalize()
 
-        animate();
+  if (controls.isLocked) {
+    velocity.x = direction.x * speed * 0.1
+    velocity.z = direction.z * speed * 0.1
+    controls.moveRight(velocity.x)
+    controls.moveForward(velocity.z)
+  }
 
-        document.body.requestFullscreen();
-    </script>
+  renderer.render(scene, camera)
+}
+
+animate()
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight
+  camera.updateProjectionMatrix()
+  renderer.setSize(window.innerWidth, window.innerHeight)
+})
+
+  </script>
 </body>
 </html>

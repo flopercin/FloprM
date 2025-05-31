@@ -2,40 +2,36 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>3D Платформа (FPS)</title>
+    <title>3D Платформа</title>
+    <link rel="icon" href="MoreButton.png" type="image/png">
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
     <style>
         body { margin: 0; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #joystick {
+        #joystickArea {
             position: fixed;
-            bottom: 50px;
-            left: 50px;
-            width: 100px;
-            height: 100px;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            display: none;
+            bottom: 0;
+            left: 0;
+            width: 50%;
+            height: 40%;
             z-index: 100;
         }
-        #joystickKnob {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 50%;
-            top: 30px;
-            left: 30px;
+        #lookArea {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 60%;
+            z-index: 100;
         }
         #jumpBtn {
             position: fixed;
-            bottom: 50px;
-            right: 50px;
+            bottom: 20px;
+            right: 20px;
             width: 80px;
             height: 80px;
             background: rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            display: none;
             z-index: 100;
             color: white;
             font-size: 24px;
@@ -45,7 +41,8 @@
     </style>
 </head>
 <body>
-    <div id="joystick"><div id="joystickKnob"></div></div>
+    <div id="joystickArea"></div>
+    <div id="lookArea"></div>
     <div id="jumpBtn">↑</div>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
@@ -87,18 +84,19 @@
         floor.position.y = -0.5;
         scene.add(floor);
         
-        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-        const cubes = [];
+        // Добавляем стену
+        const wallGeometry = new THREE.BoxGeometry(10, 5, 1);
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+        wall.position.set(0, 2.5, -8);
+        scene.add(wall);
         
-        for (let i = 0; i < 5; i++) {
-            const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-            cube.position.x = Math.random() * 10 - 5;
-            cube.position.z = Math.random() * 10 - 5;
-            cube.position.y = 0.5;
-            scene.add(cube);
-            cubes.push(cube);
-        }
+        // Добавляем прямоугольник для прыжка
+        const boxGeometry = new THREE.BoxGeometry(2, 0.5, 2);
+        const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff });
+        const box = new THREE.Mesh(boxGeometry, boxMaterial);
+        box.position.set(0, 0.25, -4);
+        scene.add(box);
         
         const controls = new THREE.PointerLockControls(camera, document.body);
         
@@ -106,9 +104,6 @@
             document.addEventListener('click', () => {
                 controls.lock();
             });
-        } else {
-            document.getElementById('joystick').style.display = 'block';
-            document.getElementById('jumpBtn').style.display = 'block';
         }
         
         const moveSpeed = 0.1;
@@ -120,84 +115,126 @@
             jump: false
         };
         
+        // Мобильное управление
         let joystickActive = false;
-        let joystickAngle = 0;
-        let joystickDistance = 0;
-        const joystick = document.getElementById('joystick');
-        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickStartX = 0;
+        let joystickStartY = 0;
+        let joystickMoveX = 0;
+        let joystickMoveY = 0;
+        
+        let lookActive = false;
+        let lookStartX = 0;
+        let lookStartY = 0;
+        let lookMoveX = 0;
+        let lookMoveY = 0;
         
         if (isMobile) {
-            joystick.addEventListener('touchstart', handleJoystickStart);
-            joystick.addEventListener('touchmove', handleJoystickMove);
-            joystick.addEventListener('touchend', handleJoystickEnd);
+            const joystickArea = document.getElementById('joystickArea');
+            const lookArea = document.getElementById('lookArea');
+            const jumpBtn = document.getElementById('jumpBtn');
             
-            document.getElementById('jumpBtn').addEventListener('touchstart', () => {
-                keys.jump = true;
-            });
-            document.getElementById('jumpBtn').addEventListener('touchend', () => {
-                keys.jump = false;
-            });
+            joystickArea.addEventListener('touchstart', handleJoystickStart);
+            joystickArea.addEventListener('touchmove', handleJoystickMove);
+            joystickArea.addEventListener('touchend', handleJoystickEnd);
+            
+            lookArea.addEventListener('touchstart', handleLookStart);
+            lookArea.addEventListener('touchmove', handleLookMove);
+            lookArea.addEventListener('touchend', handleLookEnd);
+            
+            jumpBtn.addEventListener('touchstart', () => keys.jump = true);
+            jumpBtn.addEventListener('touchend', () => keys.jump = false);
         } else {
             document.addEventListener('keydown', (e) => {
-                switch(e.key.toLowerCase()) {
-                    case 'w': keys.forward = true; break;
-                    case 's': keys.backward = true; break;
-                    case 'a': keys.left = true; break;
-                    case 'd': keys.right = true; break;
-                    case ' ': keys.jump = true; break;
-                }
+                const key = e.key.toLowerCase();
+                if (key === 'w' || key === 'ц') keys.forward = true;
+                if (key === 's' || key === 'ы') keys.backward = true;
+                if (key === 'a' || key === 'ф') keys.left = true;
+                if (key === 'd' || key === 'в') keys.right = true;
+                if (key === ' ') keys.jump = true;
             });
             
             document.addEventListener('keyup', (e) => {
-                switch(e.key.toLowerCase()) {
-                    case 'w': keys.forward = false; break;
-                    case 's': keys.backward = false; break;
-                    case 'a': keys.left = false; break;
-                    case 'd': keys.right = false; break;
-                    case ' ': keys.jump = false; break;
-                }
+                const key = e.key.toLowerCase();
+                if (key === 'w' || key === 'ц') keys.forward = false;
+                if (key === 's' || key === 'ы') keys.backward = false;
+                if (key === 'a' || key === 'ф') keys.left = false;
+                if (key === 'd' || key === 'в') keys.right = false;
+                if (key === ' ') keys.jump = false;
             });
         }
         
         function handleJoystickStart(e) {
             e.preventDefault();
             joystickActive = true;
-            updateJoystick(e);
+            const touch = e.touches[0];
+            joystickStartX = touch.clientX;
+            joystickStartY = touch.clientY;
+            joystickMoveX = 0;
+            joystickMoveY = 0;
         }
         
         function handleJoystickMove(e) {
             e.preventDefault();
-            if (joystickActive) updateJoystick(e);
+            if (joystickActive) {
+                const touch = e.touches[0];
+                joystickMoveX = touch.clientX - joystickStartX;
+                joystickMoveY = touch.clientY - joystickStartY;
+                
+                const deadZone = 20;
+                const maxMove = 50;
+                
+                if (Math.abs(joystickMoveX) > deadZone || Math.abs(joystickMoveY) > deadZone) {
+                    keys.forward = joystickMoveY < -deadZone;
+                    keys.backward = joystickMoveY > deadZone;
+                    keys.left = joystickMoveX < -deadZone;
+                    keys.right = joystickMoveX > deadZone;
+                } else {
+                    keys.forward = false;
+                    keys.backward = false;
+                    keys.left = false;
+                    keys.right = false;
+                }
+            }
         }
         
         function handleJoystickEnd(e) {
             e.preventDefault();
             joystickActive = false;
-            joystickKnob.style.transform = 'translate(30px, 30px)';
             keys.forward = false;
             keys.backward = false;
             keys.left = false;
             keys.right = false;
         }
         
-        function updateJoystick(e) {
-            const rect = joystick.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
+        function handleLookStart(e) {
+            e.preventDefault();
+            lookActive = true;
             const touch = e.touches[0];
-            const x = touch.clientX - centerX;
-            const y = touch.clientY - centerY;
-            
-            const distance = Math.min(Math.sqrt(x*x + y*y), 30);
-            joystickAngle = Math.atan2(x, y);
-            joystickDistance = distance;
-            
-            joystickKnob.style.transform = `translate(${30 + distance * Math.sin(joystickAngle)}px, ${30 + distance * Math.cos(joystickAngle)}px)`;
-            
-            keys.forward = joystickDistance > 10 && Math.abs(joystickAngle) < Math.PI/3;
-            keys.backward = joystickDistance > 10 && Math.abs(joystickAngle) > 2*Math.PI/3;
-            keys.left = joystickDistance > 10 && joystickAngle < -Math.PI/6 && joystickAngle > -5*Math.PI/6;
-            keys.right = joystickDistance > 10 && joystickAngle > Math.PI/6 && joystickAngle < 5*Math.PI/6;
+            lookStartX = touch.clientX;
+            lookStartY = touch.clientY;
+            lookMoveX = 0;
+            lookMoveY = 0;
+        }
+        
+        function handleLookMove(e) {
+            e.preventDefault();
+            if (lookActive) {
+                const touch = e.touches[0];
+                lookMoveX = touch.clientX - lookStartX;
+                lookMoveY = touch.clientY - lookStartY;
+                lookStartX = touch.clientX;
+                lookStartY = touch.clientY;
+                
+                // Поворот камеры
+                const lookSpeed = 0.002;
+                controls.rotateLeft(-lookMoveX * lookSpeed);
+                controls.rotateUp(-lookMoveY * lookSpeed);
+            }
+        }
+        
+        function handleLookEnd(e) {
+            e.preventDefault();
+            lookActive = false;
         }
         
         let velocityY = 0;
@@ -210,15 +247,28 @@
                 new THREE.Vector3(1, 2, 1)
             );
             
-            for (const cube of cubes) {
-                const cubeBox = new THREE.Box3().setFromObject(cube);
-                if (playerBox.intersectsBox(cubeBox)) return true;
+            // Проверка столкновения с полом
+            const floorBox = new THREE.Box3().setFromObject(floor);
+            floorBox.max.y = 0.5;
+            if (playerBox.intersectsBox(floorBox)) return true;
+            
+            // Проверка столкновения со стеной
+            const wallBox = new THREE.Box3().setFromObject(wall);
+            if (playerBox.intersectsBox(wallBox)) return true;
+            
+            // Проверка столкновения с прямоугольником
+            const boxBox = new THREE.Box3().setFromObject(box);
+            if (playerBox.intersectsBox(boxBox)) {
+                if (position.y > box.position.y + 0.25) return true;
             }
             
-            const floorBox = new THREE.Box3().setFromObject(floor);
-            if (position.y < 0.5) return true;
-            
             return false;
+        }
+        
+        function checkOnGround(position) {
+            const testPosition = position.clone();
+            testPosition.y -= 0.1;
+            return checkCollision(testPosition);
         }
         
         function animate() {
@@ -245,27 +295,36 @@
             if (moveDirection.length() > 0) {
                 moveDirection.normalize().multiplyScalar(moveSpeed);
                 const newPosition = controls.getObject().position.clone().add(moveDirection);
-                if (!checkCollision(newPosition)) {
-                    controls.getObject().position.copy(newPosition);
+                
+                // Проверка границ платформы
+                if (Math.abs(newPosition.x) < 10 && Math.abs(newPosition.z) < 10) {
+                    if (!checkCollision(newPosition)) {
+                        controls.getObject().position.copy(newPosition);
+                    }
+                } else {
+                    // Игрок за пределами платформы - падение
+                    if (controls.getObject().position.y > 0) {
+                        // Продолжаем падать
+                    } else {
+                        // Телепортация обратно на платформу
+                        controls.getObject().position.set(0, 2, 0);
+                        velocityY = 0;
+                    }
                 }
             }
             
-            if (controls.getObject().position.y <= 2) {
-                controls.getObject().position.y = 2;
-                velocityY = 0;
-                isOnGround = true;
-            } else {
-                isOnGround = false;
+            isOnGround = checkOnGround(controls.getObject().position);
+            
+            if (isOnGround) {
+                velocityY = Math.max(velocityY, 0);
+                if (controls.getObject().position.y < 2) {
+                    controls.getObject().position.y = 2;
+                }
             }
             
             if (keys.jump && isOnGround) {
                 velocityY = 0.3;
                 isOnGround = false;
-            }
-            
-            if (controls.getObject().position.y < -10) {
-                controls.getObject().position.set(0, 2, 0);
-                velocityY = 0;
             }
             
             renderer.render(scene, camera);

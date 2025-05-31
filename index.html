@@ -84,18 +84,18 @@
         floor.position.y = -0.5;
         scene.add(floor);
         
-        // Добавляем стену
+        // Стенка
         const wallGeometry = new THREE.BoxGeometry(10, 5, 1);
         const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
         const wall = new THREE.Mesh(wallGeometry, wallMaterial);
         wall.position.set(0, 2.5, -8);
         scene.add(wall);
         
-        // Добавляем прямоугольник для прыжка
-        const boxGeometry = new THREE.BoxGeometry(2, 0.5, 2);
+        // Платформа для прыжка (толще и с правильными коллизиями)
+        const boxGeometry = new THREE.BoxGeometry(2, 1, 2);
         const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff });
         const box = new THREE.Mesh(boxGeometry, boxMaterial);
-        box.position.set(0, 0.25, -4);
+        box.position.set(0, 0.5, -4);
         scene.add(box);
         
         const controls = new THREE.PointerLockControls(camera, document.body);
@@ -127,22 +127,23 @@
         let lookStartY = 0;
         let lookMoveX = 0;
         let lookMoveY = 0;
+        let lastLookTime = 0;
         
         if (isMobile) {
             const joystickArea = document.getElementById('joystickArea');
             const lookArea = document.getElementById('lookArea');
             const jumpBtn = document.getElementById('jumpBtn');
             
-            joystickArea.addEventListener('touchstart', handleJoystickStart);
-            joystickArea.addEventListener('touchmove', handleJoystickMove);
-            joystickArea.addEventListener('touchend', handleJoystickEnd);
+            joystickArea.addEventListener('touchstart', handleJoystickStart, { passive: false });
+            joystickArea.addEventListener('touchmove', handleJoystickMove, { passive: false });
+            joystickArea.addEventListener('touchend', handleJoystickEnd, { passive: false });
             
-            lookArea.addEventListener('touchstart', handleLookStart);
-            lookArea.addEventListener('touchmove', handleLookMove);
-            lookArea.addEventListener('touchend', handleLookEnd);
+            lookArea.addEventListener('touchstart', handleLookStart, { passive: false });
+            lookArea.addEventListener('touchmove', handleLookMove, { passive: false });
+            lookArea.addEventListener('touchend', handleLookEnd, { passive: false });
             
-            jumpBtn.addEventListener('touchstart', () => keys.jump = true);
-            jumpBtn.addEventListener('touchend', () => keys.jump = false);
+            jumpBtn.addEventListener('touchstart', () => { keys.jump = true; }, { passive: false });
+            jumpBtn.addEventListener('touchend', () => { keys.jump = false; }, { passive: false });
         } else {
             document.addEventListener('keydown', (e) => {
                 const key = e.key.toLowerCase();
@@ -175,7 +176,7 @@
         
         function handleJoystickMove(e) {
             e.preventDefault();
-            if (joystickActive) {
+            if (joystickActive && e.touches.length > 0) {
                 const touch = e.touches[0];
                 joystickMoveX = touch.clientX - joystickStartX;
                 joystickMoveY = touch.clientY - joystickStartY;
@@ -214,21 +215,28 @@
             lookStartY = touch.clientY;
             lookMoveX = 0;
             lookMoveY = 0;
+            lastLookTime = performance.now();
         }
         
         function handleLookMove(e) {
             e.preventDefault();
-            if (lookActive) {
+            if (lookActive && e.touches.length > 0) {
                 const touch = e.touches[0];
-                lookMoveX = touch.clientX - lookStartX;
-                lookMoveY = touch.clientY - lookStartY;
-                lookStartX = touch.clientX;
-                lookStartY = touch.clientY;
+                const now = performance.now();
+                const deltaTime = now - lastLookTime;
+                lastLookTime = now;
                 
-                // Поворот камеры
-                const lookSpeed = 0.002;
-                controls.rotateLeft(-lookMoveX * lookSpeed);
-                controls.rotateUp(-lookMoveY * lookSpeed);
+                if (deltaTime > 0) {
+                    lookMoveX = touch.clientX - lookStartX;
+                    lookMoveY = touch.clientY - lookStartY;
+                    lookStartX = touch.clientX;
+                    lookStartY = touch.clientY;
+                    
+                    // Поворот камеры с учетом времени между кадрами
+                    const lookSpeed = 0.2 * deltaTime / 16.67;
+                    controls.rotateLeft(-lookMoveX * lookSpeed);
+                    controls.rotateUp(-lookMoveY * lookSpeed);
+                }
             }
         }
         
@@ -240,26 +248,27 @@
         let velocityY = 0;
         const gravity = 0.02;
         let isOnGround = false;
+        let lastYPosition = 2;
         
         function checkCollision(position) {
             const playerBox = new THREE.Box3().setFromCenterAndSize(
-                new THREE.Vector3(position.x, position.y, position.z),
-                new THREE.Vector3(1, 2, 1)
+                new THREE.Vector3(position.x, position.y + 1, position.z),
+                new THREE.Vector3(0.5, 1.8, 0.5)
             );
             
             // Проверка столкновения с полом
             const floorBox = new THREE.Box3().setFromObject(floor);
-            floorBox.max.y = 0.5;
             if (playerBox.intersectsBox(floorBox)) return true;
             
             // Проверка столкновения со стеной
             const wallBox = new THREE.Box3().setFromObject(wall);
             if (playerBox.intersectsBox(wallBox)) return true;
             
-            // Проверка столкновения с прямоугольником
+            // Проверка столкновения с платформой
             const boxBox = new THREE.Box3().setFromObject(box);
             if (playerBox.intersectsBox(boxBox)) {
-                if (position.y > box.position.y + 0.25) return true;
+                // Если игрок выше платформы хотя бы на половину своего роста
+                if (position.y > box.position.y + 0.5) return true;
             }
             
             return false;
@@ -274,9 +283,30 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            velocityY -= gravity;
-            controls.getObject().position.y += velocityY;
+            const currentPosition = controls.getObject().position.clone();
             
+            // Применяем гравитацию
+            velocityY -= gravity;
+            currentPosition.y += velocityY;
+            
+            // Проверяем коллизии по вертикали
+            if (checkCollision(currentPosition)) {
+                if (velocityY < 0) {
+                    // Находим точное положение над поверхностью
+                    const step = 0.05;
+                    while (checkCollision(currentPosition) && step < 1.0) {
+                        currentPosition.y += step;
+                    }
+                    velocityY = 0;
+                    isOnGround = true;
+                } else {
+                    velocityY = 0;
+                }
+            } else {
+                isOnGround = false;
+            }
+            
+            // Движение
             const direction = new THREE.Vector3();
             camera.getWorldDirection(direction);
             direction.y = 0;
@@ -294,38 +324,42 @@
             
             if (moveDirection.length() > 0) {
                 moveDirection.normalize().multiplyScalar(moveSpeed);
-                const newPosition = controls.getObject().position.clone().add(moveDirection);
+                const newPosition = currentPosition.clone().add(moveDirection);
                 
-                // Проверка границ платформы
-                if (Math.abs(newPosition.x) < 10 && Math.abs(newPosition.z) < 10) {
-                    if (!checkCollision(newPosition)) {
-                        controls.getObject().position.copy(newPosition);
-                    }
-                } else {
-                    // Игрок за пределами платформы - падение
-                    if (controls.getObject().position.y > 0) {
-                        // Продолжаем падать
-                    } else {
-                        // Телепортация обратно на платформу
-                        controls.getObject().position.set(0, 2, 0);
-                        velocityY = 0;
-                    }
+                // Проверка коллизий по горизонтали
+                if (!checkCollision(newPosition)) {
+                    currentPosition.x = newPosition.x;
+                    currentPosition.z = newPosition.z;
                 }
             }
             
-            isOnGround = checkOnGround(controls.getObject().position);
-            
-            if (isOnGround) {
-                velocityY = Math.max(velocityY, 0);
-                if (controls.getObject().position.y < 2) {
-                    controls.getObject().position.y = 2;
-                }
-            }
-            
+            // Прыжок
             if (keys.jump && isOnGround) {
-                velocityY = 0.3;
+                velocityY = 0.15;
                 isOnGround = false;
             }
+            
+            // Проверка границ платформы
+            if (Math.abs(currentPosition.x) > 10 || Math.abs(currentPosition.z) > 10) {
+                if (currentPosition.y > 0) {
+                    // Падение
+                } else {
+                    // Телепортация обратно
+                    currentPosition.set(0, 2, 0);
+                    velocityY = 0;
+                }
+            }
+            
+            // Фильтрация дрожания (плавное позиционирование)
+            const smoothFactor = 0.5;
+            controls.getObject().position.lerp(currentPosition, smoothFactor);
+            
+            // Фиксируем высоту, если мы на земле
+            if (isOnGround && Math.abs(controls.getObject().position.y - 2) < 0.1) {
+                controls.getObject().position.y = 2;
+            }
+            
+            lastYPosition = controls.getObject().position.y;
             
             renderer.render(scene, camera);
         }

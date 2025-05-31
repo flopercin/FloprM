@@ -3,38 +3,51 @@
 <head>
     <meta charset="utf-8">
     <title>3D Платформа (FPS)</title>
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #mobileControls { 
-            position: fixed; 
-            bottom: 20px; 
-            width: 100%; 
-            display: none; 
-            justify-content: space-around; 
-            z-index: 100; 
+        #joystick {
+            position: fixed;
+            bottom: 50px;
+            left: 50px;
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: none;
+            z-index: 100;
         }
-        .mobileBtn { 
-            width: 60px; 
-            height: 60px; 
-            background: rgba(255,255,255,0.5); 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 24px; 
-            user-select: none; 
+        #joystickKnob {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            top: 30px;
+            left: 30px;
+        }
+        #jumpBtn {
+            position: fixed;
+            bottom: 50px;
+            right: 50px;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: none;
+            z-index: 100;
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            line-height: 80px;
         }
     </style>
 </head>
 <body>
-    <div id="mobileControls">
-        <div class="mobileBtn" id="leftBtn">←</div>
-        <div class="mobileBtn" id="upBtn">↑</div>
-        <div class="mobileBtn" id="rightBtn">→</div>
-        <div class="mobileBtn" id="jumpBtn">↥</div>
-    </div>
+    <div id="joystick"><div id="joystickKnob"></div></div>
+    <div id="jumpBtn">↑</div>
+    
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
     <script>
@@ -48,6 +61,7 @@
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.domElement.style.touchAction = 'none';
         document.body.appendChild(renderer.domElement);
         
         const light = new THREE.AmbientLight(0xffffff, 0.5);
@@ -93,30 +107,97 @@
                 controls.lock();
             });
         } else {
-            document.getElementById('mobileControls').style.display = 'flex';
+            document.getElementById('joystick').style.display = 'block';
+            document.getElementById('jumpBtn').style.display = 'block';
         }
         
         const moveSpeed = 0.1;
         const keys = {
-            w: false, a: false, s: false, d: false, ' ': false
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            jump: false
         };
         
+        let joystickActive = false;
+        let joystickAngle = 0;
+        let joystickDistance = 0;
+        const joystick = document.getElementById('joystick');
+        const joystickKnob = document.getElementById('joystickKnob');
+        
         if (isMobile) {
-            document.getElementById('upBtn').addEventListener('touchstart', () => keys.w = true);
-            document.getElementById('upBtn').addEventListener('touchend', () => keys.w = false);
-            document.getElementById('leftBtn').addEventListener('touchstart', () => keys.a = true);
-            document.getElementById('leftBtn').addEventListener('touchend', () => keys.a = false);
-            document.getElementById('rightBtn').addEventListener('touchstart', () => keys.d = true);
-            document.getElementById('rightBtn').addEventListener('touchend', () => keys.d = false);
-            document.getElementById('jumpBtn').addEventListener('touchstart', () => keys[' '] = true);
-            document.getElementById('jumpBtn').addEventListener('touchend', () => keys[' '] = false);
+            joystick.addEventListener('touchstart', handleJoystickStart);
+            joystick.addEventListener('touchmove', handleJoystickMove);
+            joystick.addEventListener('touchend', handleJoystickEnd);
+            
+            document.getElementById('jumpBtn').addEventListener('touchstart', () => {
+                keys.jump = true;
+            });
+            document.getElementById('jumpBtn').addEventListener('touchend', () => {
+                keys.jump = false;
+            });
         } else {
             document.addEventListener('keydown', (e) => {
-                if (e.key in keys) keys[e.key] = true;
+                switch(e.key.toLowerCase()) {
+                    case 'w': keys.forward = true; break;
+                    case 's': keys.backward = true; break;
+                    case 'a': keys.left = true; break;
+                    case 'd': keys.right = true; break;
+                    case ' ': keys.jump = true; break;
+                }
             });
+            
             document.addEventListener('keyup', (e) => {
-                if (e.key in keys) keys[e.key] = false;
+                switch(e.key.toLowerCase()) {
+                    case 'w': keys.forward = false; break;
+                    case 's': keys.backward = false; break;
+                    case 'a': keys.left = false; break;
+                    case 'd': keys.right = false; break;
+                    case ' ': keys.jump = false; break;
+                }
             });
+        }
+        
+        function handleJoystickStart(e) {
+            e.preventDefault();
+            joystickActive = true;
+            updateJoystick(e);
+        }
+        
+        function handleJoystickMove(e) {
+            e.preventDefault();
+            if (joystickActive) updateJoystick(e);
+        }
+        
+        function handleJoystickEnd(e) {
+            e.preventDefault();
+            joystickActive = false;
+            joystickKnob.style.transform = 'translate(30px, 30px)';
+            keys.forward = false;
+            keys.backward = false;
+            keys.left = false;
+            keys.right = false;
+        }
+        
+        function updateJoystick(e) {
+            const rect = joystick.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const touch = e.touches[0];
+            const x = touch.clientX - centerX;
+            const y = touch.clientY - centerY;
+            
+            const distance = Math.min(Math.sqrt(x*x + y*y), 30);
+            joystickAngle = Math.atan2(x, y);
+            joystickDistance = distance;
+            
+            joystickKnob.style.transform = `translate(${30 + distance * Math.sin(joystickAngle)}px, ${30 + distance * Math.cos(joystickAngle)}px)`;
+            
+            keys.forward = joystickDistance > 10 && Math.abs(joystickAngle) < Math.PI/3;
+            keys.backward = joystickDistance > 10 && Math.abs(joystickAngle) > 2*Math.PI/3;
+            keys.left = joystickDistance > 10 && joystickAngle < -Math.PI/6 && joystickAngle > -5*Math.PI/6;
+            keys.right = joystickDistance > 10 && joystickAngle > Math.PI/6 && joystickAngle < 5*Math.PI/6;
         }
         
         let velocityY = 0;
@@ -146,15 +227,27 @@
             velocityY -= gravity;
             controls.getObject().position.y += velocityY;
             
-            const newPosition = controls.getObject().position.clone();
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+            direction.y = 0;
+            direction.normalize();
             
-            if (keys.w) newPosition.add(controls.getDirection().multiplyScalar(moveSpeed));
-            if (keys.s) newPosition.add(controls.getDirection().multiplyScalar(-moveSpeed));
-            if (keys.a) newPosition.add(controls.getDirection().cross(camera.up).normalize().multiplyScalar(-moveSpeed));
-            if (keys.d) newPosition.add(controls.getDirection().cross(camera.up).normalize().multiplyScalar(moveSpeed));
+            const right = new THREE.Vector3();
+            right.crossVectors(direction, camera.up).normalize();
             
-            if (!checkCollision(newPosition)) {
-                controls.getObject().position.copy(newPosition);
+            const moveDirection = new THREE.Vector3();
+            
+            if (keys.forward) moveDirection.add(direction);
+            if (keys.backward) moveDirection.sub(direction);
+            if (keys.left) moveDirection.sub(right);
+            if (keys.right) moveDirection.add(right);
+            
+            if (moveDirection.length() > 0) {
+                moveDirection.normalize().multiplyScalar(moveSpeed);
+                const newPosition = controls.getObject().position.clone().add(moveDirection);
+                if (!checkCollision(newPosition)) {
+                    controls.getObject().position.copy(newPosition);
+                }
             }
             
             if (controls.getObject().position.y <= 2) {
@@ -165,7 +258,7 @@
                 isOnGround = false;
             }
             
-            if (keys[' '] && isOnGround) {
+            if (keys.jump && isOnGround) {
                 velocityY = 0.3;
                 isOnGround = false;
             }
